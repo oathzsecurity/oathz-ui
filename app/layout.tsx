@@ -1,39 +1,56 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
-import "./globals.css";
+"use client";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import Link from "next/link";
+import React, { useEffect, useState } from "react";
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export default function HomePage() {
+  const [devices, setDevices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export const metadata: Metadata = {
-  title: "OATHZ Dashboard",
-  description: "Trackblock UI",
-};
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch("https://api.oathzsecurity.com/status");
+        const data = await res.json();
+        setDevices(data);
+      } catch (e) {
+        console.error(e);
+      }
+      setLoading(false);
+    }
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, []);
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {/* GOOGLE MAPS JAVASCRIPT LOADER */}
-        <Script
-          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
-          strategy="beforeInteractive"
-        />
+    <main className="p-8">
+      <h1 className="text-3xl font-bold mb-6">Your Devices</h1>
 
-        {children}
-      </body>
-    </html>
+      {loading && <p>Loading devices...</p>}
+
+      {!loading && devices.length === 0 && (
+        <p>No devices reporting yet.</p>
+      )}
+
+      <ul className="space-y-4">
+        {devices.map((dev) => (
+          <li
+            key={dev.device_id}
+            className="border p-4 rounded hover:bg-gray-50 dark:hover:bg-zinc-900"
+          >
+            <Link
+              href={`/devices/${dev.device_id}`}
+              className="text-blue-600 font-semibold"
+            >
+              {dev.device_id}
+            </Link>
+            <p className="text-sm text-gray-600">
+              Last seen: {dev.last_seen}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </main>
   );
 }
