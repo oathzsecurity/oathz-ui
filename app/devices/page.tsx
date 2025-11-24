@@ -1,4 +1,4 @@
-import { fetchAPI } from "@/lib/api";
+import { fetchAPI } from "../../lib/api";
 import Link from "next/link";
 
 interface DeviceStatus {
