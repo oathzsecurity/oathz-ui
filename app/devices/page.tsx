@@ -6,6 +6,10 @@ interface DeviceStatus {
   last_seen: string;
 }
 
+
+
+// temporary rebuild trigger
+
 export default async function DevicesPage() {
   const devices: DeviceStatus[] = await fetchAPI("/devices");
 
