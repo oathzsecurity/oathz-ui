@@ -1,4 +1,5 @@
 import dynamic from "next/dynamic";
+import { fetchAPI } from "@/lib/api"; // ✅ Correct import path
 
 interface DeviceEvent {
   device_id: string;
@@ -14,13 +15,9 @@ const DeviceMap = dynamic(() => import("@/components/DeviceMap"), {
   ssr: false,
 });
 
+// Fetch event history for ONE device
 async function fetchDeviceEvents(id: string): Promise<DeviceEvent[]> {
-  const res = await fetch(`https://api.oathzsecurity.com/device/${id}/events`, {
-    cache: "no-store",
-  });
-
-  if (!res.ok) return [];
-  return res.json();
+  return fetchAPI(`/device/${id}/events`);
 }
 
 export default async function DeviceDetailPage({
@@ -51,7 +48,6 @@ export default async function DeviceDetailPage({
           DEVICE STATUS CARD
       ============================= */}
       <div className="border rounded-lg p-6 bg-black text-green-400 space-y-2 shadow-lg">
-
         <h2 className="text-xl font-semibold mb-2">Device Status</h2>
 
         <p>
