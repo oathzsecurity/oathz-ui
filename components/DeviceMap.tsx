@@ -1,40 +1,54 @@
 "use client";
 
-import React from "react";
+import { useEffect } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
-interface DeviceMapProps {
+// --- FIX LEAFLET ICONS IN NEXT.JS/Vercel ---
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+// --------------------------------------------------
+
+interface Props {
   latitude: number | null;
   longitude: number | null;
   deviceId: string;
 }
 
-export default function DeviceMap({ latitude, longitude, deviceId }: DeviceMapProps) {
-  const hasFix = latitude !== null && longitude !== null;
+export default function DeviceMap({ latitude, longitude, deviceId }: Props) {
+  useEffect(() => {
+    if (!latitude || !longitude) return;
+
+    const map = L.map("device-map").setView([latitude, longitude], 17);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    L.marker([latitude, longitude]).addTo(map);
+
+    return () => {
+      map.remove();
+    };
+  }, [latitude, longitude]);
 
   return (
-    <div className="w-full h-[400px] bg-zinc-800 text-white rounded-lg p-4 flex flex-col items-center justify-center">
-      <h2 className="text-xl font-semibold mb-4">
-        Live Map – Device {deviceId}
-      </h2>
-
-      {!hasFix ? (
-        <p className="text-zinc-300">No GPS fix yet…</p>
-      ) : (
-        <div className="text-center">
-          <p>
-            <strong>Latitude:</strong> {latitude}
-          </p>
-          <p>
-            <strong>Longitude:</strong> {longitude}
-          </p>
-
-          <div className="mt-4 bg-zinc-700 p-6 rounded-lg">
-            <p className="text-zinc-300">
-              (Map preview placeholder — Google Maps upgrade coming soon!)
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
+    <div
+      id="device-map"
+      className="w-full"
+      style={{
+        height: "400px",
+        borderRadius: "12px",
+        overflow: "hidden",
+        border: "1px solid #333",
+      }}
+    />
   );
 }
