@@ -1,53 +1,95 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useEffect, useState } from "react";
+import DeviceMap from "@/components/DeviceMap";
 
 interface DeviceEvent {
   device_id: string;
-  event_type: string;
-  state: string;
-  gps_fix: boolean;
-  movement_confirmed: boolean;
-  latitude: number;
-  longitude: number;
   last_seen: string;
+  latitude: number | null;
+  longitude: number | null;
+  gps_fix: boolean;
+  state: string;
+  event_type: string;
 }
 
-export default function DeviceDetailPage(props: { params: Promise<{ id: string }> }) {
-  const { id } = use(props.params); // ✅ FIX — unwrap params safely
+export default function DeviceDetailPage({ params }: { params: { id: string } }) {
+  const id = params.id;
 
   const [events, setEvents] = useState<DeviceEvent[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadEvents() {
+    async function load() {
       try {
-        const res = await fetch(`https://api.oathzsecurity.com/device/${id}/events`);
+        const res = await fetch(
+          `https://api.oathzsecurity.com/device/${id}/events`,
+          { cache: "no-store" }
+        );
         const data = await res.json();
-        setEvents(data);
+
+        // Reverse order: latest first
+        const sorted = data.reverse();
+
+        setEvents(sorted);
       } catch (err) {
-        console.error("Failed to load events:", err);
-      } finally {
-        setLoading(false);
+        console.error("Failed to fetch device events", err);
+        setEvents([]);
       }
+      setLoading(false);
     }
 
-    loadEvents();
+    load();
   }, [id]);
 
-  if (loading) return <p style={{ padding: "24px" }}>Loading device data…</p>;
+  if (loading) {
+    return (
+      <main style={{ padding: "24px" }}>
+        <h1 className="text-3xl font-bold mb-6">Device: {id}</h1>
+        <p>Loading…</p>
+      </main>
+    );
+  }
 
-  if (!events || events.length === 0)
-    return <p style={{ padding: "24px" }}>No data received yet for this device.</p>;
+  if (!events || events.length === 0) {
+    return (
+      <main style={{ padding: "24px" }}>
+        <h1 className="text-3xl font-bold mb-6">Device: {id}</h1>
+        <p>No data received yet for this device.</p>
+      </main>
+    );
+  }
+
+  const latest = events[0]; // newest event
+  const hasGPS = latest.latitude && latest.longitude;
 
   return (
     <main style={{ padding: "24px" }}>
       <h1 className="text-3xl font-bold mb-6">Device: {id}</h1>
 
-      <div className="text-sm opacity-70 mb-4">
-        {events.length} events loaded
+      {/* 🗺️ MAP */}
+      {hasGPS && (
+        <div style={{ marginBottom: "24px" }}>
+          <DeviceMap
+            latitude={latest.latitude}
+            longitude={latest.longitude}
+            deviceId={id}
+          />
+        </div>
+      )}
+
+      {/* 📊 STATUS */}
+      <div className="border rounded-lg p-6 bg-black text-green-400 mb-6">
+        <p><strong>Last seen:</strong> {latest.last_seen}</p>
+        <p><strong>State:</strong> {latest.state}</p>
+        <p><strong>GPS Fix:</strong> {latest.gps_fix ? "Yes" : "No"}</p>
+        <p>
+          <strong>Coordinates:</strong>{" "}
+          {latest.latitude}, {latest.longitude}
+        </p>
       </div>
 
+      {/* 📝 RAW EVENTS */}
       <pre
         style={{
           background: "#111",
@@ -55,7 +97,7 @@ export default function DeviceDetailPage(props: { params: Promise<{ id: string }
           padding: "16px",
           borderRadius: "8px",
           overflowX: "auto",
-          whiteSpace: "pre-wrap"
+          fontSize: "14px",
         }}
       >
         {JSON.stringify(events, null, 2)}
