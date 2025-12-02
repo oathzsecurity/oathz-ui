@@ -19,7 +19,8 @@ export default function DeviceDetailPage() {
   const [events, setEvents] = useState<DeviceEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Convert timestamp → "X seconds ago"
+  // ------------- helpers -------------
+
   function timeAgo(ts: string) {
     const diffMs = Date.now() - new Date(ts).getTime();
     const diffSec = Math.floor(diffMs / 1000);
@@ -30,6 +31,29 @@ export default function DeviceDetailPage() {
     return `${diffHr}h ago`;
   }
 
+  // Haversine distance in meters between two lat/lon points
+  function distanceMeters(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ) {
+    const toRad = (v: number) => (v * Math.PI) / 180;
+    const R = 6371000; // Earth radius in m
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  // ------------- data fetching -------------
+
   useEffect(() => {
     async function fetchEvents() {
       try {
@@ -39,7 +63,7 @@ export default function DeviceDetailPage() {
         );
         const data = await res.json();
 
-        // Ensure it's sorted newest → oldest
+        // sort oldest → newest
         const sorted = [...data].sort(
           (a, b) =>
             new Date(a.timestamp).getTime() -
@@ -56,11 +80,11 @@ export default function DeviceDetailPage() {
 
     fetchEvents();
 
-    // 🔥 Auto-refresh every 5 seconds
-    const interval = setInterval(fetchEvents, 5000);
-
+    const interval = setInterval(fetchEvents, 5000); // live polling
     return () => clearInterval(interval);
   }, [id]);
+
+  // ------------- loading / empty states -------------
 
   if (loading) {
     return (
@@ -80,8 +104,58 @@ export default function DeviceDetailPage() {
     );
   }
 
-  // Always use the latest event
-  const latest = events[events.length - 1];
+  // ------------- derive latest + mode -------------
+
+  const gpsEvents = events.filter(
+    (e) => e.latitude !== null && e.longitude !== null
+  );
+
+  // If for some reason no gps events yet, still show last seen text
+  const latest = gpsEvents.length > 0 ? gpsEvents[gpsEvents.length - 1] : events[events.length - 1];
+
+  const latestTs = new Date(latest.timestamp).getTime();
+  const ageMs = Date.now() - latestTs;
+
+  // offline if no event in last 20 seconds
+  const isOnline = ageMs < 20_000;
+
+  // CHASE MODE: total movement >= 10m
+  let isChaseMode = false;
+  let breadcrumbPoints: { latitude: number; longitude: number }[] = [];
+
+  if (isOnline && gpsEvents.length >= 2) {
+    const first = gpsEvents[0];
+    const last = gpsEvents[gpsEvents.length - 1];
+
+    const totalMove = distanceMeters(
+      first.latitude as number,
+      first.longitude as number,
+      last.latitude as number,
+      last.longitude as number
+    );
+
+    if (totalMove >= 10) {
+      isChaseMode = true;
+      breadcrumbPoints = gpsEvents.map((e) => ({
+        latitude: e.latitude as number,
+        longitude: e.longitude as number,
+      }));
+    }
+  }
+
+  // If offline → force no breadcrumb trail
+  if (!isOnline) {
+    isChaseMode = false;
+    breadcrumbPoints = [];
+  }
+
+  const hasGPS =
+    latest.latitude !== null &&
+    latest.longitude !== null &&
+    !isNaN(latest.latitude as number) &&
+    !isNaN(latest.longitude as number);
+
+  // ------------- render -------------
 
   return (
     <main style={{ padding: 24 }}>
@@ -90,18 +164,39 @@ export default function DeviceDetailPage() {
       </h1>
 
       <p style={{ marginTop: 4, color: "#888" }}>
-        Last seen:{" "}
+        Status:{" "}
+        <span
+          style={{
+            fontWeight: "bold",
+            color: isOnline ? "#16a34a" : "#dc2626",
+          }}
+        >
+          {isOnline ? "ONLINE" : "OFFLINE"}
+        </span>{" "}
+        · Last seen{" "}
         <span style={{ fontWeight: "bold" }}>
           {timeAgo(latest.timestamp)}
         </span>
       </p>
 
+      <p style={{ marginTop: 4, color: "#888" }}>
+        Mode:{" "}
+        <span style={{ fontWeight: "bold" }}>
+          {isChaseMode ? "CHASE" : "HEARTBEAT"}
+        </span>
+      </p>
+
       <div style={{ marginTop: 24 }}>
-        <DeviceMap
-          latitude={latest.latitude}
-          longitude={latest.longitude}
-          deviceId={id}
-        />
+        {hasGPS ? (
+          <DeviceMap
+            latitude={latest.latitude as number}
+            longitude={latest.longitude as number}
+            deviceId={id}
+            points={breadcrumbPoints}
+          />
+        ) : (
+          <p>No GPS fix yet for this device.</p>
+        )}
       </div>
 
       <h2
