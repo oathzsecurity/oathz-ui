@@ -15,9 +15,9 @@ interface DeviceEvent {
   state?: string;
 }
 
-export default function DeviceDetailPage(props: { params: Promise<{ id: string }> }) {
-  // ✅ Unwrap Next.js params Promise using use()
-  const { id } = use(props.params);
+export default function DeviceDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
+
 
   const [events, setEvents] = useState<DeviceEvent[]>([]);
   const [loading, setLoading] = useState(true);
