@@ -1,3 +1,6 @@
+console.log("🔥 DEVICE PAGE LOADED ON SERVER");
+
+
 import { fetchAPI } from "@/lib/api";
 import DeviceMap from "@/components/DeviceMap";
 import Link from "next/link";
