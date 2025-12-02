@@ -1,57 +1,105 @@
-import { fetchAPI } from "@/lib/api";
-import Link from "next/link";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import DeviceMap from "@/components/DeviceMap";
 
-interface DeviceStatus {
+interface DeviceEvent {
+  id: number;
   device_id: string;
   latitude: number | null;
   longitude: number | null;
-  last_seen: string | null;
+  timestamp: string;
 }
 
-interface Props {
-  params: { id: string };
-}
+export default function DeviceDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
 
-export default async function DeviceDetailPage({ params }: Props) {
-  const id = params.id;
+  const [events, setEvents] = useState<DeviceEvent[] | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // FETCH DEVICE STATUS (LATEST GPS POINT)
-  const status: DeviceStatus = await fetchAPI(`/device/${id}/status`);
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const res = await fetch(
+          `https://api.oathzsecurity.com/device/${id}/events`,
+          { cache: "no-store" }
+        );
+        const data = await res.json();
+        setEvents(data);
+      } catch (err) {
+        console.error("Error fetching events:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchEvents();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <main style={{ padding: 24 }}>
+        <h1 className="text-3xl font-bold">Device: {id}</h1>
+        <p>Loading events…</p>
+      </main>
+    );
+  }
+
+  if (!events || events.length === 0) {
+    return (
+      <main style={{ padding: 24 }}>
+        <h1 className="text-3xl font-bold">Device: {id}</h1>
+        <p>No events found yet for this device.</p>
+      </main>
+    );
+  }
+
+  // Latest event is the LAST one in the array (ASC order)
+  const latest = events[events.length - 1];
 
   return (
-    <main style={{ padding: "24px" }}>
-      <Link href="/devices" className="text-blue-600 underline mb-4 block">
-        ← Back to Devices
-      </Link>
+    <main style={{ padding: 24 }}>
+      <h1 className="text-3xl font-bold mb-4">Device: {id}</h1>
 
-      <h1 className="text-3xl font-bold mb-4">
-        Device:{" "}
-        <span className="text-red-600 font-bold">
-          ● LIVE
-        </span>
-      </h1>
+      <div style={{ marginTop: 24 }}>
+        <DeviceMap
+          latitude={latest.latitude}
+          longitude={latest.longitude}
+          deviceId={id}
+        />
+      </div>
 
-      {/* NO GPS YET */}
-      {!status.latitude || !status.longitude ? (
-        <p>Waiting for first GPS coordinates…</p>
-      ) : (
-        <>
-          <div className="mb-6">
-            <strong>Last Seen:</strong> {status.last_seen}
-          </div>
+      <h2 className="text-xl font-bold mt-10">Latest Event</h2>
+      <pre
+        style={{
+          marginTop: 12,
+          padding: 16,
+          background: "#111",
+          color: "#0f0",
+          borderRadius: 8,
+          overflowX: "auto",
+        }}
+      >
+        {JSON.stringify(latest, null, 2)}
+      </pre>
 
-          {/* MAP */}
-          <DeviceMap
-            latitude={status.latitude}
-            longitude={status.longitude}
-            deviceId={id}
-            points={[
-              { latitude: status.latitude, longitude: status.longitude }
-            ]}
-          />
-        </>
-      )}
+      <h2 className="text-xl font-bold mt-10">
+        All Events ({events.length})
+      </h2>
+      <pre
+        style={{
+          marginTop: 12,
+          padding: 16,
+          background: "#111",
+          color: "#0f0",
+          borderRadius: 8,
+          overflowX: "auto",
+        }}
+      >
+        {JSON.stringify(events, null, 2)}
+      </pre>
     </main>
   );
 }
