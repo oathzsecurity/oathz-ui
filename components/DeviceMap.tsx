@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// --- FIX LEAFLET ICONS IN NEXT.JS/Vercel ---
+// Fix default marker icons on Vercel
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 
 L.Icon.Default.mergeOptions({
@@ -14,15 +14,19 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-// --------------------------------------------------
-
 interface Props {
   latitude: number | null;
   longitude: number | null;
   deviceId: string;
+  points?: { latitude: number; longitude: number }[];
 }
 
-export default function DeviceMap({ latitude, longitude, deviceId }: Props) {
+export default function DeviceMap({
+  latitude,
+  longitude,
+  deviceId,
+  points = [],
+}: Props) {
   useEffect(() => {
     if (!latitude || !longitude) return;
 
@@ -32,19 +36,35 @@ export default function DeviceMap({ latitude, longitude, deviceId }: Props) {
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
+    // Current location marker
     L.marker([latitude, longitude]).addTo(map);
 
+    // Breadcrumb polyline
+    if (points.length > 1) {
+      const polylinePoints = points.map((p) => [p.latitude, p.longitude]) as [
+        number,
+        number
+      ][];
+
+      L.polyline(polylinePoints, {
+        color: "red",
+        weight: 3,
+        opacity: 0.8,
+      }).addTo(map);
+    }
+
+    // CLEANUP FIX HERE
     return () => {
       map.remove();
     };
-  }, [latitude, longitude]);
+  }, [latitude, longitude, points]);
 
   return (
     <div
       id="device-map"
       className="w-full"
       style={{
-        height: "400px",
+        height: "420px",
         borderRadius: "12px",
         overflow: "hidden",
         border: "1px solid #333",

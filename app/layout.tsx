@@ -1,4 +1,5 @@
 import "./globals.css";
+import "leaflet/dist/leaflet.css";  // ← FIX: guaranteed loading order
 
 export const metadata = {
   title: "OATHZ Security Dashboard",
